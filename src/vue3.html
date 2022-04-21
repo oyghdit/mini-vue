@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+</head>
+
+<style type="text/css">
+    input {
+        border: 1px solid red;
+    }
+</style>
+
+<body>
+    <div id="app">
+        <div>{{message}}</div>
+        <input v-model="message">
+        <div>#{a}</div>
+    </div>
+</body>
+<script type="text/javascript">
+    // 定义一个Dep类，用来收集数据依赖和更新数据
+    class Dep {
+        constructor() {
+            // 数据订阅者
+            this.subscribers = []
+        }
+        // 收集依赖
+        depend() {
+            if (Dep.target) {
+                this.subscribers.push(Dep.target);
+            }
+        }
+        // 通知依赖
+        notify() {
+            this.subscribers.forEach(fn => fn())
+        }
+    }
+
+    function autorun(fn) {
+        Dep.target = fn;
+        fn();
+        Dep.target = null;
+    }
+
+
+    // 观测数据类
+    function Observe(obj, vm) {
+        console.log(obj, vm);
+        Object.keys(obj).forEach((key) => {
+            console.log(key, 'key');
+            let dep = new Dep();
+            let inertValue = obj[key];
+            Object.defineProperty(vm, key, {
+                get() {
+                    dep.depend()
+                    console.log(dep, 'dap')
+                    return inertValue;
+                },
+                set(newValue) {
+                    inertValue = newValue;
+                    dep.notify()
+                }
+            })
+        })
+    }
+
+    // 编译模板
+    function compile(node, vm) {
+        let frag = document.createDocumentFragment();
+        console.log(frag, 'frag');
+        let child = node.firstElementChild;
+        while (child) {
+            compileElement(child, vm)
+            child = child.nextElementSibling;
+        }
+        return frag;
+    }
+
+    // 解析模板
+    function compileElement(node, vm) {
+        let attr = node.attributes;
+        for (let i = 0; i < attr.length; i++) {
+            let name = attr[i].nodeValue;
+            console.log(name)
+            switch (attr[i].nodeName) {
+                case "v-model":
+                    node.addEventListener("input", (e) => {
+                        vm[name] = e.target.value;
+                        console.log(e.target.value)
+                    })
+                    autorun(() => { node.value = vm[name] })
+                    break;
+            }
+        }
+        let reg = /\{\{(.*)\}\}/;
+        if (reg.test(node.innerHTML)) {
+            var name = RegExp.$1;
+            name = name.trim();
+            autorun(() => { node.innerHTML = vm[name] })
+        }
+        let reg1 = /\#\{(.*)}/;
+        if (reg1.test(node.innerHTML)) {
+            let name = RegExp.$1;
+            name = name.trim();
+            autorun(() => { node.innerHTML = vm[name] + 1 })
+        }
+    }
+
+    // Vue方法
+    function Vue(options) {
+        console.log(options, 'options');
+        // 讲数据进行监听
+        Observe(options.data, this)
+        let dom = document.querySelector(options.el);
+        let newDom = compile(dom, this);
+        dom.appendChild(newDom);
+    }
+
+
+    let vm = new Vue({
+        el: '#app',
+        data: {
+            message: 'Hello Vue!',
+            a: 12
+        }
+    })
+</script>
+
+</html>
